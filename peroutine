@@ -92,7 +92,7 @@ class Peroutine::Job
 	end
 	def on_today?
 		time_elapsed = Time.now - @one_date
-		days_elapsed = (time_elapsed / @period / 86400).floor
+		days_elapsed = (time_elapsed / 86400).floor
 		days_elapsed % period == 0
 	end
 	def should_trigger_on?
