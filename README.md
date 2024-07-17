@@ -60,8 +60,36 @@ For example, you can add the following line to your crontab:
 0 * * * * /path/to/peroutine cronjob
 ```
 
+## Docker
+
+You can deploy peroutine with Docker.
+First, put `config.yml` in `/path/to/config/config.yml`, and then use the following Docker compose file:
+
+```yaml
+services:
+  peroutine:
+    container_name: peroutine
+    image: ulysseszhan/peroutine:master
+    volumes:
+      - /path/to/config:/root/.local/share/peroutine
+    environment:
+      TZ: America/Los_Angeles
+```
+
+The `TZ` environment variable is important.
+
+If your `config.yml` utilizes some commands that are not available in the Docker image,
+you can install it by creating a custom Dockerfile.
+Here is an example for adding the `curl` command:
+
+```dockerfile
+FROM ulysseszhan/peroutine:master
+RUN apk add --no-cache curl
+```
+
+Then, replace the `image` field in the Docker compose file with a `build` filed.
+
 ## Tips
 
 You can use [ntfy](https://ntfy.sh) or [libnotify](https://gitlab.gnome.org/GNOME/libnotify) to send notifications
 in the `on_command` and `off_command`.
-
