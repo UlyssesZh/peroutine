@@ -3,6 +3,7 @@
 require 'optparse'
 require 'yaml'
 require 'date'
+require 'fileutils'
 
 module Peroutine
 	class << self
@@ -16,10 +17,12 @@ module Peroutine
 				puts "  #{name.ljust(length)}  #{@commands[name.to_sym].description}"
 			end
 		end
-		def read_config path
-			path = File.expand_path path || '~/.local/share/peroutine/config.yml'
-			config = YAML.load_file path, permitted_classes: [Date]
-			config.map { |hash| Peroutine::Job.new **hash.transform_keys(&:to_sym) }
+		def read_config config_path, env_path
+			config_path = File.expand_path config_path
+			env_path = File.expand_path env_path
+			config = YAML.load_file config_path, permitted_classes: [Date]
+			env = File.exist?(env_path) ? File.read(env_path) : ''
+			config.map { |hash| Peroutine::Job.new env:, **hash.transform_keys(&:to_sym) }
 		end
 	end
 	@commands = {}
@@ -27,7 +30,10 @@ module Peroutine
 end
 
 module Peroutine::Commands
-	module_function
+	DEFAULT_CONFIG = '~/.local/share/peroutine/config.yml'
+	DEFAULT_ENV = '~/.local/share/peroutine/env.sh'
+
+	extend self
 	def help command_name = nil
 		if command_name
 			Peroutine.commands[command_name.to_sym].print_help
@@ -35,11 +41,11 @@ module Peroutine::Commands
 			Peroutine.print_master_help
 		end
 	end
-	def cronjob config: nil
-		Peroutine.read_config(config).each &:run
+	def cronjob config: nil, env: nil
+		Peroutine.read_config(check_config(config), check_env(env)).each &:run
 	end
 	def list config: nil, show: 'all'
-		job_groups = Peroutine.read_config(config).group_by &:on_today?
+		job_groups = Peroutine.read_config(check_config(config)).group_by &:on_today?
 		job_groups[true] ||= []
 		job_groups[false] ||= []
 		case show
@@ -55,7 +61,27 @@ module Peroutine::Commands
 		end
 	end
 	def edit config: nil
-		system ENV['EDITOR'] || 'nano', File.expand_path(config || '~/.local/share/peroutine/config.yml')
+		edit_file config || DEFAULT_CONFIG
+	end
+	def env env: nil
+		edit_file env || DEFAULT_ENV
+	end
+
+	private
+	def edit_file file
+		path = File.expand_path file
+		FileUtils.mkdir_p File.dirname path
+		system ENV['EDITOR'] || 'nano', path
+	end
+	def check_config config
+		return DEFAULT_CONFIG unless config
+		raise "Config file not found: #{config}" unless File.exist? config
+		config
+	end
+	def check_env env
+		return DEFAULT_ENV unless env
+		warn "Env file not found: #{env}" unless File.exist? env
+		env
 	end
 end
 
@@ -75,16 +101,17 @@ class Peroutine::Command
 	end
 	def run
 		@option_parser.parse! into: @options
-		Peroutine::Commands.send @name, *ARGV, **@options
+		Peroutine::Commands.public_send @name, *ARGV, **@options
 	end
 end
 
 class Peroutine::Job
 	attr_reader :period, :one_date, :description, :on_command, :off_command, :on_time, :off_time
-	def initialize period:, one_date:, description: "", on_command: nil, off_command: nil, on_time: nil, off_time: nil
+	def initialize env:, period:, one_date:, description: "", on_command: nil, off_command: nil, on_time: nil, off_time: nil
 		@period = period
 		@one_date = one_date.to_time
 		@description = description
+		@env = env
 		@on_command = on_command
 		@off_command = off_command
 		@on_time = on_time
@@ -102,10 +129,10 @@ class Peroutine::Job
 		!!@off_time && !on_today? && Time.now.hour == @off_time
 	end
 	def trigger_on
-		system @on_command if @on_command
+		system "#@env\n#@on_command" if @on_command
 	end
 	def trigger_off
-		system @off_command if @off_command
+		system "#@env\n#@off_command" if @off_command
 	end
 	def run
 		trigger_on if should_trigger_on?
@@ -120,6 +147,7 @@ end
 Peroutine::Command.new :cronjob, "The command intended to be run hourly by cron" do |op|
 	op.banner = "Usage: #{__FILE__} cronjob [options]"
 	op.on '-c', '--config CONFIG', 'The config file to use'
+	op.on '-e', '--env ENV', 'The env file to use'
 end
 
 Peroutine::Command.new :list, "List the jobs" do |op|
@@ -131,6 +159,11 @@ end
 Peroutine::Command.new :edit, "Edit the config file" do |op|
 	op.banner = "Usage: #{__FILE__} edit [options]"
 	op.on '-c', '--config CONFIG', 'The config file to edit'
+end
+
+Peroutine::Command.new :env, "Edit the env file" do |op|
+	op.banner = "Usage: #{__FILE__} env [options]"
+	op.on '-e', '--env ENV', 'The env file to edit'
 end
 
 Peroutine.commands[ARGV.shift&.to_sym].run

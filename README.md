@@ -60,6 +60,20 @@ For example, you can add the following line to your crontab:
 0 * * * * /path/to/peroutine cronjob
 ```
 
+You can also run `peroutine env` to edit the env file.
+For example, one can use this in the env file:
+
+```sh
+ENDPOINT=https://ntfy.sh/peroutine
+ntfy() {
+	curl -H "Title: $1" -d "$2" $ENDPOINT
+}
+```
+
+Then, you can simply use something like `ntfy "Wash hair" "Wash your hair today."`
+in the `on_command` and `off_command`.
+Behind the scenes, the commands are simply concatenated to the env file when executed.
+
 ## Docker
 
 You can deploy peroutine with Docker.
@@ -87,7 +101,10 @@ FROM ulysseszhan/peroutine:master
 RUN apk add --no-cache curl
 ```
 
-Then, replace the `image` field in the Docker compose file with a `build` filed.
+Then, replace the `image` field in the Docker compose file with a `build` field.
+
+To have an env file when using Docker,
+you need to put the env file in `/path/to/config/env.sh`.
 
 ## Tips
 
