@@ -102,6 +102,8 @@ RUN apk add --no-cache curl
 ```
 
 Then, replace the `image` field in the Docker compose file with a `build` field.
+If you use a Dockerfile like this, to update the image, you need to run
+`docker compose up --build --force-recreate --no-deps`.
 
 To have an env file when using Docker,
 you need to put the env file in `/path/to/config/env.sh`.
