@@ -9,4 +9,5 @@ RUN mkdir -p .local/share/peroutine
 VOLUME [ "/root/.local/share/peroutine" ]
 
 COPY crontab .
-CMD [ "supercronic", "crontab" ]
+# Must use full path for supercronic command: https://github.com/aptible/supercronic/issues/181
+CMD [ "/usr/bin/supercronic", "crontab" ]
