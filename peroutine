@@ -20,6 +20,7 @@ module Peroutine
 		def read_config config_path, env_path
 			config_path = File.expand_path config_path
 			env_path = File.expand_path env_path
+			raise "Config file not found: #{config_path}" unless File.exist? config_path
 			config = YAML.load_file config_path, permitted_classes: [Date]
 			env = File.exist?(env_path) ? File.read(env_path) : ''
 			config.map { |hash| Peroutine::Job.new env:, **hash.transform_keys(&:to_sym) }
@@ -30,8 +31,9 @@ module Peroutine
 end
 
 module Peroutine::Commands
-	DEFAULT_CONFIG = '~/.local/share/peroutine/config.yml'
-	DEFAULT_ENV = '~/.local/share/peroutine/env.sh'
+	DATA_HOME = ENV['XDG_DATA_HOME'] || '~/.local/share'
+	DEFAULT_CONFIG = File.join DATA_HOME, 'peroutine/config.yml'
+	DEFAULT_ENV = File.join DATA_HOME, 'peroutine/env.sh'
 
 	extend self
 	def help command_name = nil
@@ -44,8 +46,8 @@ module Peroutine::Commands
 	def cronjob config: nil, env: nil
 		Peroutine.read_config(check_config(config), check_env(env)).each &:run
 	end
-	def list config: nil, show: 'all'
-		job_groups = Peroutine.read_config(check_config(config)).group_by &:on_today?
+	def list config: nil, env: nil, show: 'all'
+		job_groups = Peroutine.read_config(check_config(config), check_env(env)).group_by &:on_today?
 		job_groups[true] ||= []
 		job_groups[false] ||= []
 		case show
